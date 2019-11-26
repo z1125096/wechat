@@ -101,6 +101,8 @@ abstract class Handler
      * Build xml and return the response to WeChat.
      *
      * @return \Symfony\Component\HttpFoundation\Response
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
      */
     public function toResponse(): Response
     {
@@ -154,6 +156,8 @@ abstract class Handler
      * @param string $key
      *
      * @return string|null
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\Exception
      */
     public function decryptMessage(string $key)
     {
@@ -173,6 +177,7 @@ abstract class Handler
      * @param array $message
      *
      * @throws \EasyWeChat\Payment\Kernel\Exceptions\InvalidSignException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
      */
     protected function validate(array $message)
     {

@@ -13,6 +13,7 @@ namespace EasyWeChat\OpenPlatform\Auth;
 
 use EasyWeChat\Kernel\Exceptions\RuntimeException;
 use EasyWeChat\Kernel\Traits\InteractsWithCache;
+use EasyWeChat\OpenPlatform\Application;
 
 /**
  * Class VerifyTicket.
@@ -24,23 +25,18 @@ class VerifyTicket
     use InteractsWithCache;
 
     /**
-     * @var string
+     * @var \EasyWeChat\OpenPlatform\Application
      */
-    protected $appId;
+    protected $app;
 
     /**
      * Constructor.
      *
-     * @param string      $appId
-     * @param string|null $ticket
+     * @param \EasyWeChat\OpenPlatform\Application $app
      */
-    public function __construct(string $appId, string $ticket = null)
+    public function __construct(Application $app)
     {
-        $this->appId = $appId;
-
-        if (!is_null($ticket)) {
-            $this->setTicket($ticket);
-        }
+        $this->app = $app;
     }
 
     /**
@@ -49,10 +45,18 @@ class VerifyTicket
      * @param string $ticket
      *
      * @return $this
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
      */
     public function setTicket(string $ticket)
     {
         $this->getCache()->set($this->getCacheKey(), $ticket, 3600);
+
+        if (!$this->getCache()->has($this->getCacheKey())) {
+            throw new RuntimeException('Failed to cache verify ticket.');
+        }
 
         return $this;
     }
@@ -62,7 +66,9 @@ class VerifyTicket
      *
      * @return string
      *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
      * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
      */
     public function getTicket(): string
     {
@@ -80,6 +86,6 @@ class VerifyTicket
      */
     protected function getCacheKey(): string
     {
-        return 'easywechat.open_platform.verify_ticket.'.$this->appId;
+        return 'easywechat.open_platform.verify_ticket.'.$this->app['config']['app_id'];
     }
 }

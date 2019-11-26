@@ -11,6 +11,7 @@
 
 namespace EasyWeChat\Tests\Payment;
 
+use EasyWeChat\Kernel\Exceptions\InvalidArgumentException;
 use EasyWeChat\Kernel\ServiceContainer;
 use EasyWeChat\Payment\Application;
 use EasyWeChat\Tests\TestCase;
@@ -51,6 +52,16 @@ class ApplicationTest extends TestCase
         $this->assertStringStartsWith('weixin://wxpay/bizpayurl?appid=wx123456&mch_id=foo-merchant-id&time_stamp=', $app->scheme('product-id'));
     }
 
+    public function testCodeUrlScheme()
+    {
+        $app = new Application([
+            'app_id' => 'wx123456',
+            'mch_id' => 'foo-merchant-id',
+        ]);
+        $this->assertStringStartsWith('weixin://wxpay/bizpayurl?sr=foo', $app->codeUrlScheme('foo'));
+        $this->assertStringStartsWith('weixin://wxpay/bizpayurl?sr=foo/bar', $app->codeUrlScheme('foo/bar'));
+    }
+
     public function testSetSubMerchant()
     {
         $app = new Application([
@@ -76,8 +87,13 @@ class ApplicationTest extends TestCase
 
     public function testGetKey()
     {
-        $app = new Application(['key' => 'mock-key']);
-        $this->assertSame('mock-key', $app->getKey());
+        $app = new Application(['key' => '88888888888888888888888888888888']);
+        $this->assertSame('88888888888888888888888888888888', $app->getKey());
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf("'%s' should be 32 chars length.", '1234'));
+        $app = new Application(['key' => '1234']);
+        $app->getKey();
     }
 
     public function testGetKeyInSandboxMode()
@@ -87,10 +103,10 @@ class ApplicationTest extends TestCase
             'key' => 'keyxxx',
         ]);
         $sandbox = \Mockery::mock(\EasyWeChat\Payment\Sandbox\Client::class.'[getKey]', new ServiceContainer());
-        $sandbox->expects()->getKey()->andReturn('123');
+        $sandbox->expects()->getKey()->andReturn('88888888888888888888888888888888');
         $app['sandbox'] = $sandbox;
 
-        $this->assertSame('123', $app->getKey('foo'));
+        $this->assertSame('88888888888888888888888888888888', $app->getKey('foo'));
         $this->assertSame('keyxxx', $app->getKey('sandboxnew/pay/getsignkey'));
     }
 }

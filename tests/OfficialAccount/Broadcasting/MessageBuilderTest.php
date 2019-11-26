@@ -41,7 +41,7 @@ class MessageBuilderTest extends TestCase
             'text' => [
                 'content' => 'hello world!',
             ],
-        ], $builder->message(new Text('hello world!'))->to('mock-openid')->buildForPreview(Client::PREVIEW_BY_OPENID));
+        ], $builder->message(new Text('hello world!'))->buildForPreview(Client::PREVIEW_BY_OPENID, 'mock-openid'));
 
         $this->assertSame([
             'towxname' => 'mock-username',
@@ -49,17 +49,15 @@ class MessageBuilderTest extends TestCase
             'text' => [
                 'content' => 'hello world!',
             ],
-        ], $builder->message(new Text('hello world!'))->to('mock-username')->buildForPreview(Client::PREVIEW_BY_NAME));
+        ], $builder->message(new Text('hello world!'))->buildForPreview(Client::PREVIEW_BY_NAME, 'mock-username'));
     }
 
-    public function testBuildGroup()
+    public function testBuild()
     {
-        $builder = new MessageBuilder();
-
         $text = new Text('hello world!');
 
-        // without to
-        $message = $builder->message($text)->build();
+        // to all
+        $message = (new MessageBuilder())->message($text)->with(['send_ignore_reprint' => 1])->toAll()->build();
 
         $this->assertSame([
             'filter' => [
@@ -69,15 +67,16 @@ class MessageBuilderTest extends TestCase
             'text' => [
                 'content' => 'hello world!',
             ],
+            'send_ignore_reprint' => 1,
         ], $message);
 
-        // with single group
-        $message = $builder->message($text)->to('mock-group-id')->build();
+        // to tag
+        $message = (new MessageBuilder())->message($text)->toTag(23)->build();
 
         $this->assertSame([
             'filter' => [
                 'is_to_all' => false,
-                'group_id' => 'mock-group-id',
+                'tag_id' => 23,
             ],
             'msgtype' => 'text',
             'text' => [
@@ -85,8 +84,8 @@ class MessageBuilderTest extends TestCase
             ],
         ], $message);
 
-        // with multi group
-        $message = $builder->message($text)->to(['mock-group-id1', 'mock-group-id2'])->build();
+        // to users
+        $message = (new MessageBuilder())->message($text)->toUsers(['mock-group-id1', 'mock-group-id2'])->build();
 
         $this->assertSame([
             'touser' => [

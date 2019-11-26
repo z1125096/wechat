@@ -27,6 +27,9 @@ class Client extends BaseClient
      * @param string $description
      *
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function commit(int $templateId, string $extJson, string $version, string $description)
     {
@@ -39,15 +42,24 @@ class Client extends BaseClient
     }
 
     /**
+     * @param string|null $path
+     *
      * @return \EasyWeChat\Kernel\Http\Response
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function getQrCode()
+    public function getQrCode(string $path = null)
     {
-        return $this->requestRaw('wxa/get_qrcode', 'GET');
+        return $this->requestRaw('wxa/get_qrcode', 'GET', [
+            'query' => ['path' => $path],
+        ]);
     }
 
     /**
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      */
     public function getCategory()
     {
@@ -56,6 +68,8 @@ class Client extends BaseClient
 
     /**
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      */
     public function getPage()
     {
@@ -63,14 +77,21 @@ class Client extends BaseClient
     }
 
     /**
-     * @param array $itemList
+     * @param array       $itemList
+     * @param string|null $feedbackInfo
+     * @param string|null $feedbackStuff
      *
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function submitAudit(array $itemList)
+    public function submitAudit(array $itemList, string $feedbackInfo = null, string $feedbackStuff = null)
     {
         return $this->httpPostJson('wxa/submit_audit', [
             'item_list' => $itemList,
+            'feedback_info' => $feedbackInfo,
+            'feedback_stuff' => $feedbackStuff,
         ]);
     }
 
@@ -78,6 +99,9 @@ class Client extends BaseClient
      * @param int $auditId
      *
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function getAuditStatus(int $auditId)
     {
@@ -88,6 +112,8 @@ class Client extends BaseClient
 
     /**
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      */
     public function getLatestAuditStatus()
     {
@@ -96,6 +122,9 @@ class Client extends BaseClient
 
     /**
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function release()
     {
@@ -103,14 +132,108 @@ class Client extends BaseClient
     }
 
     /**
+     * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     */
+    public function withdrawAudit()
+    {
+        return $this->httpGet('wxa/undocodeaudit');
+    }
+
+    /**
+     * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     */
+    public function rollbackRelease()
+    {
+        return $this->httpGet('wxa/revertcoderelease');
+    }
+
+    /**
      * @param string $action
      *
      * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function changeVisitStatus(string $action)
     {
         return $this->httpPostJson('wxa/change_visitstatus', [
             'action' => $action,
+        ]);
+    }
+
+    /**
+     * 分阶段发布.
+     *
+     * @param int $grayPercentage
+     *
+     * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function grayRelease(int $grayPercentage)
+    {
+        return $this->httpPostJson('wxa/grayrelease', [
+            'gray_percentage' => $grayPercentage,
+        ]);
+    }
+
+    /**
+     * 取消分阶段发布.
+     *
+     * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     */
+    public function revertGrayRelease()
+    {
+        return $this->httpGet('wxa/revertgrayrelease');
+    }
+
+    /**
+     * 查询当前分阶段发布详情.
+     *
+     * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     */
+    public function getGrayRelease()
+    {
+        return $this->httpGet('wxa/getgrayreleaseplan');
+    }
+
+    /**
+     * 查询当前设置的最低基础库版本及各版本用户占比.
+     *
+     * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getSupportVersion()
+    {
+        return $this->httpPostJson('cgi-bin/wxopen/getweappsupportversion');
+    }
+
+    /**
+     * 设置最低基础库版本.
+     *
+     * @param string $version
+     *
+     * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function setSupportVersion(string $version)
+    {
+        return $this->httpPostJson('cgi-bin/wxopen/setweappsupportversion', [
+            'version' => $version,
         ]);
     }
 }

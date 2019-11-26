@@ -26,15 +26,22 @@ class ClientTest extends TestCase
             'ext_json' => '{"foo":"bar"}',
             'user_version' => 'v1.0',
             'user_desc' => 'First commit.',
-        ])->andReturn('mock-result')->once();
+        ])->andReturn('mock-result');
         $this->assertSame('mock-result', $client->commit(123, '{"foo":"bar"}', 'v1.0', 'First commit.'));
     }
 
     public function testGetQrCode()
     {
         $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
-        $client->expects()->requestRaw('wxa/get_qrcode', 'GET')->andReturn('mock-result');
+        $client->expects()->requestRaw('wxa/get_qrcode', 'GET', ['query' => ['path' => '']])->andReturn('mock-result');
         $this->assertSame('mock-result', $client->getQrCode());
+    }
+
+    public function testGetQrCodeWithParamPath()
+    {
+        $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
+        $client->expects()->requestRaw('wxa/get_qrcode', 'GET', ['query' => ['path' => 'page/index?action=1']])->andReturn('mock-result');
+        $this->assertSame('mock-result', $client->getQrCode('page/index?action=1'));
     }
 
     public function testGetCategory()
@@ -54,8 +61,8 @@ class ClientTest extends TestCase
     public function testSubmitAudit()
     {
         $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
-        $client->expects()->httpPostJson('wxa/submit_audit', ['item_list' => ['foo', 'bar']])->andReturn('mock-result');
-        $this->assertSame('mock-result', $client->submitAudit(['foo', 'bar']));
+        $client->expects()->httpPostJson('wxa/submit_audit', ['item_list' => ['foo', 'bar'], 'feedback_info' => 'foo', 'feedback_stuff' => 'foo'])->andReturn('mock-result');
+        $this->assertSame('mock-result', $client->submitAudit(['foo', 'bar'], 'foo', 'foo'));
     }
 
     public function testGetAuditStatus()
@@ -79,10 +86,45 @@ class ClientTest extends TestCase
         $this->assertSame('mock-result', $client->release());
     }
 
+    public function testWithdrawAudit()
+    {
+        $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
+        $client->expects()->httpGet('wxa/undocodeaudit')->andReturn('mock-result');
+        $this->assertSame('mock-result', $client->withdrawAudit());
+    }
+
+    public function testRollbackRelease()
+    {
+        $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
+        $client->expects()->httpGet('wxa/revertcoderelease')->andReturn('mock-result');
+        $this->assertSame('mock-result', $client->rollbackRelease());
+    }
+
     public function testChangeVisitStatus()
     {
         $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
         $client->expects()->httpPostJson('wxa/change_visitstatus', ['action' => 'foo'])->andReturn('mock-result');
         $this->assertSame('mock-result', $client->changeVisitStatus('foo'));
+    }
+
+    public function testGrayRelease()
+    {
+        $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
+        $client->expects()->httpPostJson('wxa/grayrelease', ['gray_percentage' => 20])->andReturn('mock-result');
+        $this->assertSame('mock-result', $client->grayRelease(20));
+    }
+
+    public function testRevertGrayRelease()
+    {
+        $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
+        $client->expects()->httpGet('wxa/revertgrayrelease')->andReturn('mock-result');
+        $this->assertSame('mock-result', $client->revertGrayRelease());
+    }
+
+    public function testGetGrayRelease()
+    {
+        $client = $this->mockApiClient(Client::class, [], new ServiceContainer(['app_id' => 'app-id']));
+        $client->expects()->httpGet('wxa/getgrayreleaseplan')->andReturn('mock-result');
+        $this->assertSame('mock-result', $client->getGrayRelease());
     }
 }

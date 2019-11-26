@@ -21,12 +21,18 @@ class Client extends BaseClient
      *
      * @param string $date
      * @param string $type
+     * @param array  $optional
      *
      * @return \EasyWeChat\Kernel\Http\StreamResponse|\Psr\Http\Message\ResponseInterface|\EasyWeChat\Kernel\Support\Collection|array|object|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function get(string $date, string $type = 'ALL', array $optional = [])
     {
         $params = [
+            'appid' => $this->app['config']->app_id,
             'bill_date' => $date,
             'bill_type' => $type,
         ] + $optional;
@@ -34,7 +40,7 @@ class Client extends BaseClient
         $response = $this->requestRaw($this->wrap('pay/downloadbill'), $params);
 
         if (0 === strpos($response->getBody()->getContents(), '<xml>')) {
-            return $this->resolveResponse($response, $this->app['config']->get('response_type', 'array'));
+            return $this->castResponseToType($response, $this->app['config']->get('response_type'));
         }
 
         return StreamResponse::buildFromPsrResponse($response);

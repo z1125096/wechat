@@ -18,13 +18,19 @@ class Client extends BaseClient
     /**
      * Pay the order.
      *
-     * @param array $attributes
+     * @param array $params
      *
      * @return \Psr\Http\Message\ResponseInterface|\EasyWeChat\Kernel\Support\Collection|array|object|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function pay(array $attributes)
+    public function pay(array $params)
     {
-        return $this->request($this->wrap('pay/micropay'), $attributes);
+        $params['appid'] = $this->app['config']->app_id;
+
+        return $this->request($this->wrap('pay/micropay'), $params);
     }
 
     /**
@@ -33,9 +39,16 @@ class Client extends BaseClient
      * @param string $authCode
      *
      * @return \Psr\Http\Message\ResponseInterface|\EasyWeChat\Kernel\Support\Collection|array|object|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function authCodeToOpenid(string $authCode)
     {
-        return $this->request('tools/authcodetoopenid', ['auth_code' => $authCode]);
+        return $this->request('tools/authcodetoopenid', [
+            'appid' => $this->app['config']->app_id,
+            'auth_code' => $authCode,
+        ]);
     }
 }

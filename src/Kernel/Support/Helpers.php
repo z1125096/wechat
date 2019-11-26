@@ -36,6 +36,23 @@ function generate_sign(array $attributes, $key, $encryptMethod = 'md5')
 }
 
 /**
+ * @param string $signType
+ * @param string $secretKey
+ *
+ * @return \Closure|string
+ */
+function get_encrypt_method(string $signType, string $secretKey = '')
+{
+    if ('HMAC-SHA256' === $signType) {
+        return function ($str) use ($secretKey) {
+            return hash_hmac('sha256', $str, $secretKey);
+        };
+    }
+
+    return 'md5';
+}
+
+/**
  * Get client ip.
  *
  * @return string
@@ -80,7 +97,7 @@ function current_url()
 {
     $protocol = 'http://';
 
-    if (!empty($_SERVER['HTTPS']) || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? 'http') === 'https') {
+    if ((!empty($_SERVER['HTTPS']) && 'off' !== $_SERVER['HTTPS']) || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? 'http') === 'https') {
         $protocol = 'https://';
     }
 
@@ -97,4 +114,18 @@ function current_url()
 function str_random($length)
 {
     return Str::random($length);
+}
+
+/**
+ * @param string $content
+ * @param string $publicKey
+ *
+ * @return string
+ */
+function rsa_public_encrypt($content, $publicKey)
+{
+    $encrypted = '';
+    openssl_public_encrypt($content, $encrypted, openssl_pkey_get_public($publicKey), OPENSSL_PKCS1_OAEP_PADDING);
+
+    return base64_encode($encrypted);
 }

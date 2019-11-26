@@ -11,13 +11,13 @@
 
 namespace EasyWeChat\Tests\Kernel;
 
+use EasyWeChat\Kernel\BaseClient;
 use EasyWeChat\Kernel\Config;
+use EasyWeChat\Kernel\Log\LogManager;
 use EasyWeChat\Kernel\ServiceContainer;
 use EasyWeChat\Tests\TestCase;
+use EasyWeChatComposer\Delegation\DelegationTo;
 use GuzzleHttp\Client;
-use Monolog\Handler\ErrorLogHandler;
-use Monolog\Handler\StreamHandler;
-use Monolog\Logger;
 use Pimple\Container;
 use Pimple\ServiceProviderInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,7 +28,7 @@ class ServiceContainerTest extends TestCase
     {
         $container = new ServiceContainer();
 
-        $this->assertEmpty($container->getProviders());
+        $this->assertNotEmpty($container->getProviders());
 
         // __set, __get, offsetGet
         $this->assertInstanceOf(Config::class, $container['config']);
@@ -36,6 +36,8 @@ class ServiceContainerTest extends TestCase
 
         $this->assertInstanceOf(Client::class, $container['http_client']);
         $this->assertInstanceOf(Request::class, $container['request']);
+        $this->assertInstanceOf(LogManager::class, $container['log']);
+        $this->assertInstanceOf(LogManager::class, $container['logger']);
 
         $container['foo'] = 'foo';
         $container->bar = 'bar';
@@ -57,38 +59,16 @@ class ServiceContainerTest extends TestCase
         $this->assertSame('foo', $container['foo']);
     }
 
-    public function testLoggerCreator()
+    public function testMagicGetDelegation()
     {
-        $container = new DummyContainerForProviderTest();
+        $container = \Mockery::mock(ServiceContainer::class);
 
-        // null config
-        $this->assertInstanceOf(Logger::class, $container['logger']);
-        $this->assertSame(str_replace('\\', '.', strtolower(DummyContainerForProviderTest::class)), $container['logger']->getName());
-        $this->assertCount(1, $container['logger']->getHandlers());
-        $this->assertInstanceOf(ErrorLogHandler::class, $container['logger']->getHandlers()[0]);
+        $container->shouldReceive('delegateTo')->andReturn(DelegationTo::class);
+        $container->shouldReceive('offsetGet')->andReturn(BaseClient::class);
+        $container->shouldReceive('shouldDelegate')->andReturn(true, false);
 
-        // log with handler
-        $container = new ServiceContainer([
-            'log' => [
-                'handler' => new StreamHandler('/tmp/easywechat.log'),
-            ],
-        ]);
-
-        $this->assertCount(1, $container['logger']->getHandlers());
-        $this->assertInstanceOf(StreamHandler::class, $container['logger']->getHandlers()[0]);
-
-        // log with file and level
-        $container = new ServiceContainer([
-            'log' => [
-                'level' => 'debug',
-                'file' => '/tmp/easywechat.log',
-            ],
-        ]);
-
-        $this->assertCount(1, $container['logger']->getHandlers());
-        $handler = $container['logger']->getHandlers()[0];
-        $this->assertInstanceOf(StreamHandler::class, $handler);
-        $this->assertSame('/tmp/easywechat.log', $handler->getUrl());
+        $this->assertSame(DelegationTo::class, $container->log);
+        $this->assertSame(BaseClient::class, $container->config);
     }
 }
 

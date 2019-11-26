@@ -11,10 +11,6 @@
 
 namespace EasyWeChat\Kernel\Traits;
 
-use EasyWeChat\Kernel\Contracts\Arrayable;
-use EasyWeChat\Kernel\Exceptions\InvalidConfigException;
-use EasyWeChat\Kernel\Http\Response;
-use EasyWeChat\Kernel\Support\Collection;
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\HandlerStack;
@@ -27,6 +23,8 @@ use Psr\Http\Message\ResponseInterface;
  */
 trait HasHttpRequests
 {
+    use ResponseCastable;
+
     /**
      * @var \GuzzleHttp\ClientInterface
      */
@@ -86,14 +84,18 @@ trait HasHttpRequests
     }
 
     /**
-     * Return GuzzleHttp\Client instance.
+     * Return GuzzleHttp\ClientInterface instance.
      *
-     * @return \GuzzleHttp\Client
+     * @return ClientInterface
      */
-    public function getHttpClient(): Client
+    public function getHttpClient(): ClientInterface
     {
         if (!($this->httpClient instanceof ClientInterface)) {
-            $this->httpClient = new Client();
+            if (property_exists($this, 'app') && $this->app['http_client']) {
+                $this->httpClient = $this->app['http_client'];
+            } else {
+                $this->httpClient = new Client(['handler' => HandlerStack::create($this->getGuzzleHandler())]);
+            }
         }
 
         return $this->httpClient;
@@ -102,8 +104,8 @@ trait HasHttpRequests
     /**
      * Add a middleware.
      *
-     * @param callable    $middleware
-     * @param null|string $name
+     * @param callable $middleware
+     * @param string   $name
      *
      * @return $this
      */
@@ -135,7 +137,9 @@ trait HasHttpRequests
      * @param string $method
      * @param array  $options
      *
-     * @return \Psr\Http\Message\ResponseInterface|\EasyWeChat\Kernel\Support\Collection|array|object|string
+     * @return \Psr\Http\Message\ResponseInterface
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function request($url, $method = 'GET', $options = []): ResponseInterface
     {
@@ -178,61 +182,13 @@ trait HasHttpRequests
             return $this->handlerStack;
         }
 
-        $this->handlerStack = HandlerStack::create();
+        $this->handlerStack = HandlerStack::create($this->getGuzzleHandler());
 
         foreach ($this->middlewares as $name => $middleware) {
             $this->handlerStack->push($middleware, $name);
         }
 
         return $this->handlerStack;
-    }
-
-    /**
-     * @param \Psr\Http\Message\ResponseInterface $response
-     * @param string|null                         $type
-     *
-     * @return array|\EasyWeChat\Kernel\Support\Collection|object|\Psr\Http\Message\ResponseInterface|string
-     *
-     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
-     */
-    protected function resolveResponse(ResponseInterface $response, $type = null)
-    {
-        $response = Response::buildFromPsrResponse($response);
-        $response->getBody()->rewind();
-
-        switch ($type ?? 'array') {
-            case 'collection':
-                return $response->toCollection();
-            case 'array':
-                return $response->toArray();
-            case 'object':
-                return $response->toObject();
-            case 'raw':
-                return $response;
-            default:
-                if (!is_subclass_of($type, Arrayable::class)) {
-                    throw new InvalidConfigException(sprintf('Config key "response_type" classname must be an instanceof %s', Arrayable::class));
-                }
-
-                return new $type($response);
-        }
-    }
-
-    /**
-     * @param mixed  $response
-     * @param string $type
-     *
-     * @return array|\EasyWeChat\Kernel\Support\Collection|object|string
-     */
-    protected function transformResponseToType($response, string $type)
-    {
-        if ($response instanceof ResponseInterface) {
-            $response = Response::buildFromPsrResponse($response);
-        } elseif (($response instanceof Collection) || is_array($response) || is_object($response)) {
-            $response = new Response(200, [], json_encode($response));
-        }
-
-        return $this->resolveResponse($response, $type);
     }
 
     /**
@@ -255,5 +211,21 @@ trait HasHttpRequests
         }
 
         return $options;
+    }
+
+    /**
+     * Get guzzle handler.
+     *
+     * @return callable
+     */
+    protected function getGuzzleHandler()
+    {
+        if (property_exists($this, 'app') && isset($this->app['guzzle_handler'])) {
+            return is_string($handler = $this->app->raw('guzzle_handler'))
+                        ? new $handler()
+                        : $handler;
+        }
+
+        return \GuzzleHttp\choose_handler();
     }
 }

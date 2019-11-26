@@ -26,9 +26,14 @@ class Client extends BaseClient
      * @param array $params
      *
      * @return \Psr\Http\Message\ResponseInterface|\EasyWeChat\Kernel\Support\Collection|array|object|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function send(array $params)
     {
+        $params['appid'] = $this->app['config']->app_id;
         $params['openid_count'] = 1;
 
         return $this->safeRequest('mmpaymkttransfers/send_coupon', $params);
@@ -40,9 +45,15 @@ class Client extends BaseClient
      * @param array $params
      *
      * @return \Psr\Http\Message\ResponseInterface|\EasyWeChat\Kernel\Support\Collection|array|object|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function stock(array $params)
     {
+        $params['appid'] = $this->app['config']->app_id;
+
         return $this->request('mmpaymkttransfers/query_coupon_stock', $params);
     }
 
@@ -52,9 +63,15 @@ class Client extends BaseClient
      * @param array $params
      *
      * @return \Psr\Http\Message\ResponseInterface|\EasyWeChat\Kernel\Support\Collection|array|object|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public function info(array $params)
     {
+        $params['appid'] = $this->app['config']->app_id;
+
         return $this->request('mmpaymkttransfers/querycouponsinfo', $params);
     }
 }

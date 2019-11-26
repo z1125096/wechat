@@ -12,6 +12,7 @@
 namespace EasyWeChat\BasicService\Jssdk;
 
 use EasyWeChat\Kernel\BaseClient;
+use EasyWeChat\Kernel\Exceptions\RuntimeException;
 use EasyWeChat\Kernel\Support;
 use EasyWeChat\Kernel\Traits\InteractsWithCache;
 
@@ -27,7 +28,7 @@ class Client extends BaseClient
     /**
      * @var string
      */
-    const API_GET_TICKET = 'https://api.weixin.qq.com/cgi-bin/ticket/getticket';
+    protected $ticketEndpoint = 'https://api.weixin.qq.com/cgi-bin/ticket/getticket';
 
     /**
      * Current URI.
@@ -45,10 +46,14 @@ class Client extends BaseClient
      * @param bool  $json
      *
      * @return array|string
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
      */
     public function buildConfig(array $jsApiList, bool $debug = false, bool $beta = false, bool $json = true)
     {
-        $config = array_merge(compact('debug', 'beta', 'jsApiList'), $this->signature());
+        $config = array_merge(compact('debug', 'beta', 'jsApiList'), $this->configSignature());
 
         return $json ? json_encode($config) : $config;
     }
@@ -61,6 +66,10 @@ class Client extends BaseClient
      * @param bool  $beta
      *
      * @return array
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
      */
     public function getConfigArray(array $apis, bool $debug = false, bool $beta = false)
     {
@@ -74,6 +83,12 @@ class Client extends BaseClient
      * @param string $type
      *
      * @return array
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
      */
     public function getTicket(bool $refresh = false, string $type = 'jsapi'): array
     {
@@ -83,12 +98,17 @@ class Client extends BaseClient
             return $this->getCache()->get($cacheKey);
         }
 
-        $result = $this->resolveResponse(
-            $this->requestRaw(static::API_GET_TICKET, 'GET', ['query' => ['type' => $type]]),
+        /** @var array<string, mixed> $result */
+        $result = $this->castResponseToType(
+            $this->requestRaw($this->ticketEndpoint, 'GET', ['query' => ['type' => $type]]),
             'array'
         );
 
         $this->getCache()->set($cacheKey, $result, $result['expires_in'] - 500);
+
+        if (!$this->getCache()->has($cacheKey)) {
+            throw new RuntimeException('Failed to cache jssdk ticket.');
+        }
 
         return $result;
     }
@@ -101,8 +121,13 @@ class Client extends BaseClient
      * @param int|null    $timestamp
      *
      * @return array
+     *
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \Psr\SimpleCache\InvalidArgumentException
      */
-    protected function signature(string $url = null, string $nonce = null, $timestamp = null): array
+    protected function configSignature(string $url = null, string $nonce = null, $timestamp = null): array
     {
         $url = $url ?: $this->getUrl();
         $nonce = $nonce ?: Support\Str::quickRandom(10);
@@ -129,7 +154,19 @@ class Client extends BaseClient
      */
     public function getTicketSignature($ticket, $nonce, $timestamp, $url): string
     {
-        return sha1("jsapi_ticket={$ticket}&noncestr={$nonce}&timestamp={$timestamp}&url={$url}");
+        return sha1(sprintf('jsapi_ticket=%s&noncestr=%s&timestamp=%s&url=%s', $ticket, $nonce, $timestamp, $url));
+    }
+
+    /**
+     * @return string
+     */
+    public function dictionaryOrderSignature()
+    {
+        $params = func_get_args();
+
+        sort($params, SORT_STRING);
+
+        return sha1(implode('', $params));
     }
 
     /**

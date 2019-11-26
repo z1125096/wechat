@@ -11,10 +11,7 @@
 
 namespace EasyWeChat\Tests\Kernel\Traits;
 
-use EasyWeChat\Kernel\Exceptions\InvalidConfigException;
 use EasyWeChat\Kernel\Http\Response;
-use EasyWeChat\Kernel\Support\ArrayAccessible;
-use EasyWeChat\Kernel\Support\Collection;
 use EasyWeChat\Kernel\Traits\HasHttpRequests;
 use EasyWeChat\Tests\TestCase;
 use GuzzleHttp\Client;
@@ -83,7 +80,7 @@ class HasHttpRequestsTest extends TestCase
             ],
             'handler' => $handlerStack,
             'base_uri' => 'http://easywechat.com',
-        ])->andReturn($response)->once();
+        ])->andReturn($response);
 
         $this->assertSame($response, $cls->request('foo/bar'));
 
@@ -95,7 +92,7 @@ class HasHttpRequestsTest extends TestCase
             'query' => ['foo' => 'bar'],
             'handler' => $handlerStack,
             'base_uri' => 'http://easywechat.com',
-        ])->andReturn($response)->once();
+        ])->andReturn($response);
 
         $this->assertSame($response, $cls->request('foo/bar', 'post', ['query' => ['foo' => 'bar']]));
     }
@@ -114,57 +111,6 @@ class HasHttpRequestsTest extends TestCase
         $handlerStack2 = \Mockery::mock(HandlerStack::class);
         $cls->setHandlerStack($handlerStack2);
         $this->assertSame($handlerStack2, $cls->getHandlerStack());
-    }
-
-    public function testResolveResponse()
-    {
-        $cls = \Mockery::mock(DummnyClassForHasHttpRequestTest::class)->makePartial();
-
-        $response = new Response(200, [], '{"foo": "bar"}');
-
-        // collection
-        $collection = $cls->resolveResponse($response, 'collection');
-        $this->assertInstanceOf(Collection::class, $collection);
-        $this->assertSame(['foo' => 'bar'], $collection->all());
-
-        // array
-        $this->assertSame(['foo' => 'bar'], $cls->resolveResponse($response, 'array'));
-
-        // object
-        $this->assertSame('bar', $cls->resolveResponse($response, 'object')->foo);
-
-        // raw
-        $raw = $cls->resolveResponse($response, 'raw');
-        $this->assertInstanceOf(Response::class, $raw);
-
-        // custom class
-        // 1. exists
-        $dummyResponse = $cls->resolveResponse($response, DummyResponseClassForHasHttpRequestTest::class);
-        $this->assertInstanceOf(DummyResponseClassForHasHttpRequestTest::class, $dummyResponse);
-        $this->assertInstanceOf(Response::class, $dummyResponse->response);
-
-        // 2. not exists
-        $this->expectException(InvalidConfigException::class);
-        $cls->resolveResponse($response, 'Not\Exists\ClassName');
-        $this->fail('failed to assert resolveResponse should throw an exception.');
-    }
-
-    public function testTransformResponseToType()
-    {
-        $cls = \Mockery::mock(DummnyClassForHasHttpRequestTest::class)->makePartial();
-
-        // response
-        $response = new Response(200, [], '{"foo": "bar"}');
-        $this->assertInstanceOf(Collection::class, $cls->transformResponseToType($response, 'collection'));
-
-        // array
-        $response = ['foo' => 'bar'];
-        $this->assertInstanceOf(Collection::class, $cls->transformResponseToType($response, 'collection'));
-        $this->assertSame(['foo' => 'bar'], $cls->transformResponseToType($response, 'collection')->all());
-
-        // object
-        $response = json_decode(json_encode(['foo' => 'bar']));
-        $this->assertSame(['foo' => 'bar'], $cls->transformResponseToType($response, 'array'));
     }
 
     public function testFixJsonIssue()
@@ -189,7 +135,7 @@ class HasHttpRequestsTest extends TestCase
                 'Content-Type' => 'application/json',
             ],
             'base_uri' => 'http://easywechat.com',
-        ])->andReturn($response)->once();
+        ])->andReturn($response);
 
         $this->assertSame($response, $cls->request('foo/bar', 'POST', [
             'json' => [],
@@ -206,22 +152,11 @@ class HasHttpRequestsTest extends TestCase
                 'Content-Type' => 'application/json',
             ],
             'base_uri' => 'http://easywechat.com',
-        ])->andReturn($response)->once();
+        ])->andReturn($response);
 
         $cls->request('foo/bar', 'POST', [
             'json' => ['name' => '中文'],
         ]);
-    }
-}
-
-class DummyResponseClassForHasHttpRequestTest extends ArrayAccessible
-{
-    public $response;
-
-    public function __construct($response)
-    {
-        $this->response = $response;
-        parent::__construct([]);
     }
 }
 

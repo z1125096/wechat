@@ -11,26 +11,35 @@
 
 namespace EasyWeChat\Kernel;
 
-use GuzzleHttp\Client;
-use Monolog\Handler\ErrorLogHandler;
-use Monolog\Handler\HandlerInterface;
-use Monolog\Handler\StreamHandler;
-use Monolog\Logger;
+use EasyWeChat\Kernel\Providers\ConfigServiceProvider;
+use EasyWeChat\Kernel\Providers\EventDispatcherServiceProvider;
+use EasyWeChat\Kernel\Providers\ExtensionServiceProvider;
+use EasyWeChat\Kernel\Providers\HttpClientServiceProvider;
+use EasyWeChat\Kernel\Providers\LogServiceProvider;
+use EasyWeChat\Kernel\Providers\RequestServiceProvider;
+use EasyWeChatComposer\Traits\WithAggregator;
 use Pimple\Container;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Class ServiceContainer.
  *
  * @author overtrue <i@overtrue.me>
  *
- * @property \EasyWeChat\Kernel\Config                  $config
- * @property \Symfony\Component\HttpFoundation\Request  $request
- * @property \GuzzleHttp\Client                         $http_client
- * @property \Monolog\Logger                            $logger
+ * @property \EasyWeChat\Kernel\Config                          $config
+ * @property \Symfony\Component\HttpFoundation\Request          $request
+ * @property \GuzzleHttp\Client                                 $http_client
+ * @property \Monolog\Logger                                    $logger
+ * @property \Symfony\Component\EventDispatcher\EventDispatcher $events
  */
 class ServiceContainer extends Container
 {
+    use WithAggregator;
+
+    /**
+     * @var string
+     */
+    protected $id;
+
     /**
      * @var array
      */
@@ -44,36 +53,28 @@ class ServiceContainer extends Container
     /**
      * @var array
      */
-    protected $globalConfig = [
-        // http://docs.guzzlephp.org/en/stable/request-options.html
-        'http' => [
-            'timeout' => 5.0,
-            'base_uri' => 'https://api.weixin.qq.com/',
-        ],
-    ];
-
-    /**
-     * @var string
-     */
-    protected $id;
+    protected $userConfig = [];
 
     /**
      * Constructor.
      *
-     * @param array $config
-     * @param array $prepends
+     * @param array       $config
+     * @param array       $prepends
+     * @param string|null $id
      */
-    public function __construct(array $config = [], array $prepends = [])
+    public function __construct(array $config = [], array $prepends = [], string $id = null)
     {
+        $this->registerProviders($this->getProviders());
+
         parent::__construct($prepends);
 
-        $this->registerConfig($config)
-            ->registerProviders()
-            ->registerLogger()
-            ->registerRequest()
-            ->registerHttpClient();
+        $this->userConfig = $config;
 
-        $this->id = md5(json_encode($config));
+        $this->id = $id;
+
+        $this->aggregate();
+
+        $this->events->dispatch(new Events\ApplicationInitialized($this));
     }
 
     /**
@@ -81,7 +82,23 @@ class ServiceContainer extends Container
      */
     public function getId()
     {
-        return $this->id;
+        return $this->id ?? $this->id = md5(json_encode($this->userConfig));
+    }
+
+    /**
+     * @return array
+     */
+    public function getConfig()
+    {
+        $base = [
+            // http://docs.guzzlephp.org/en/stable/request-options.html
+            'http' => [
+                'timeout' => 30.0,
+                'base_uri' => 'https://api.weixin.qq.com/',
+            ],
+        ];
+
+        return array_replace_recursive($base, $this->defaultConfig, $this->userConfig);
     }
 
     /**
@@ -91,96 +108,24 @@ class ServiceContainer extends Container
      */
     public function getProviders()
     {
-        return $this->providers;
+        return array_merge([
+            ConfigServiceProvider::class,
+            LogServiceProvider::class,
+            RequestServiceProvider::class,
+            HttpClientServiceProvider::class,
+            ExtensionServiceProvider::class,
+            EventDispatcherServiceProvider::class,
+        ], $this->providers);
     }
 
     /**
-     * Register config.
-     *
-     * @param array $config
-     *
-     * @return $this
+     * @param string $id
+     * @param mixed  $value
      */
-    protected function registerConfig(array $config)
+    public function rebind($id, $value)
     {
-        $this['config'] = function () use ($config) {
-            return new Config(
-                array_replace_recursive($this->globalConfig, $this->defaultConfig, $config)
-            );
-        };
-
-        return $this;
-    }
-
-    /**
-     * Register service providers.
-     *
-     * @return $this
-     */
-    protected function registerProviders()
-    {
-        foreach ($this->providers as $provider) {
-            $this->register(new $provider());
-        }
-
-        return $this;
-    }
-
-    /**
-     * Register request.
-     *
-     * @return $this
-     */
-    protected function registerRequest()
-    {
-        isset($this['request']) || $this['request'] = function () {
-            return Request::createFromGlobals();
-        };
-
-        return $this;
-    }
-
-    /**
-     * Register logger.
-     *
-     * @return $this
-     */
-    protected function registerLogger()
-    {
-        if (isset($this['logger'])) {
-            return $this;
-        }
-
-        $logger = new Logger(str_replace('\\', '.', strtolower(get_class($this))));
-
-        if ($logFile = $this['config']['log.file']) {
-            $logger->pushHandler(new StreamHandler(
-                    $logFile,
-                    $this['config']->get('log.level', Logger::WARNING),
-                    true,
-                    $this['config']->get('log.permission', null))
-            );
-        } elseif ($this['config']['log.handler'] instanceof HandlerInterface) {
-            $logger->pushHandler($this['config']['log.handler']);
-        } else {
-            $logger->pushHandler(new ErrorLogHandler());
-        }
-
-        $this['logger'] = $logger;
-
-        return $this;
-    }
-
-    /**
-     * @return $this
-     */
-    protected function registerHttpClient()
-    {
-        isset($this['http_client']) || $this['http_client'] = function ($app) {
-            return new Client($app['config']->get('http', []));
-        };
-
-        return $this;
+        $this->offsetUnset($id);
+        $this->offsetSet($id, $value);
     }
 
     /**
@@ -192,6 +137,10 @@ class ServiceContainer extends Container
      */
     public function __get($id)
     {
+        if ($this->shouldDelegate($id)) {
+            return $this->delegateTo($id);
+        }
+
         return $this->offsetGet($id);
     }
 
@@ -204,5 +153,15 @@ class ServiceContainer extends Container
     public function __set($id, $value)
     {
         $this->offsetSet($id, $value);
+    }
+
+    /**
+     * @param array $providers
+     */
+    public function registerProviders(array $providers)
+    {
+        foreach ($providers as $provider) {
+            parent::register(new $provider());
+        }
     }
 }

@@ -159,6 +159,7 @@ class Messenger
      * @return mixed
      *
      * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
      */
     public function send($message = null)
     {
@@ -178,6 +179,8 @@ class Messenger
             'agentid' => $this->agentId,
             'safe' => intval($this->secretive),
         ], $this->to));
+
+        $this->secretive = false;
 
         return $this->client->send($message);
     }
